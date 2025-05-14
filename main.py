@@ -1,49 +1,56 @@
-import json
-import re
-from collections import defaultdict
+from crawler import crawl_website
+from indexer import (
+    build_index, save_index, load_index, print_word, find_phrase
+)
 
-INDEX_PATH = "index.json"
+def main():
+    index = None
+    loaded = False
 
-def tokenize(text):
-    return re.findall(r'\b\w+\b', text.lower())
+    while True:
+        try:
+            command = input("\nEnter command (build, load, print <word>, find <phrase>, exit): ").strip()
+            if command == "exit":
+                print("Goodbye!")
+                break
 
-def build_index(pages):
-    index = defaultdict(dict)  # word -> {url: frequency}
-    
-    for url, content in pages.items():
-        tokens = tokenize(content)
-        for word in tokens:
-            index[word][url] = index[word].get(url, 0) + 1
-    return index
+            elif command == "build":
+                pages = crawl_website()
+                index = build_index(pages)
+                save_index(index)
+                print("Index built and saved.")
+                loaded = True
 
-def save_index(index, path=INDEX_PATH):
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(index, f)
+            elif command == "load":
+                index = load_index()
+                print("Index loaded from file.")
+                loaded = True
 
-def load_index(path=INDEX_PATH):
-    with open(path, "r", encoding="utf-8") as f:
-        return json.load(f)
+            elif command.startswith("print "):
+                if not loaded:
+                    print("Please build or load the index first.")
+                    continue
+                word = command[6:].strip()
+                print_word(index, word)
 
-def print_word(index, word):
-    word = word.lower()
-    if word in index:
-        print(f"Inverted index for '{word}':")
-        for url, freq in index[word].items():
-            print(f"  {url} → {freq} times")
-    else:
-        print(f"'{word}' not found in index.")
+            elif command.startswith("find "):
+                if not loaded:
+                    print("Please build or load the index first.")
+                    continue
+                phrase = command[5:].strip()
+                result = find_phrase(index, phrase)
+                if result:
+                    print("Pages containing the phrase:")
+                    for url in result:
+                        print(f"  {url}")
+                else:
+                    print("No pages found containing all the search terms.")
 
-def find_phrase(index, phrase):
-    words = tokenize(phrase)
-    if not words:
-        return []
-    
-    sets = []
-    for word in words:
-        if word in index:
-            sets.append(set(index[word].keys()))
-        else:
-            sets.append(set())
-    
-    result = set.intersection(*sets)
-    return list(result)
+            else:
+                print("Invalid command.")
+        except KeyboardInterrupt:
+            print("\nInterrupted. Exiting...")
+            break
+
+if __name__ == "__main__":
+    main()
